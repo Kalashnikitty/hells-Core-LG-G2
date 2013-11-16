@@ -1,6 +1,6 @@
 #!/bin/bash
 export ARCH=arm
-config=hells_defconfig
+config=hells_g2_defconfig
 
 if [ ! -f out/zImage ]
 then
