@@ -41,6 +41,7 @@
 #include <linux/of_gpio.h>
 #include <mach/board.h>
 #include <linux/regulator/consumer.h>
+#include <linux/cpufreq.h>
 
 #include <linux/input/lge_touch_core.h>
 #define CUST_G2_TOUCH_WAKEUP_GESTURE
@@ -114,6 +115,11 @@ struct timeval t_ex_debug[TIME_EX_PROFILE_MAX];
 #if defined(CONFIG_LGE_VU3_TOUCHSCREEN)
 #define TOUCH_BUTTON_ENABLE_Y_POSITION 1899
 #endif
+
+#define BOOSTED_TIME	1000	/* ms */
+int d802_boosted;
+static unsigned int boosted_time = BOOSTED_TIME;
+static struct timer_list boost_timer;
 
 #if defined(CONFIG_FB)
 static int fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
@@ -1907,6 +1913,19 @@ static void check_log_finger_released(struct lge_touch_data *ts)
 #endif
 }
 
+static void touch_boost(void)
+{
+	if (boosted_time) {
+		d802_boosted = 1;
+		mod_timer(&boost_timer, jiffies + msecs_to_jiffies(boosted_time));
+	}
+}
+
+static void handle_boost(unsigned long data)
+{
+	d802_boosted = 0;
+}
+
 /* touch_work_pre_proc
  *
  * Pre-process work at touch_work
@@ -1920,6 +1939,8 @@ static int touch_work_pre_proc(struct lge_touch_data *ts)
 	atomic_dec(&ts->next_work);
 	ts->ts_data.total_num = 0;
 	ts->int_pin_state = 0;
+
+	touch_boost();
 
 	if(unlikely(ts->work_sync_err_cnt >= MAX_RETRY_COUNT)){
 		TOUCH_ERR_MSG("Work Sync Failed: Irq-pin has some unknown problems\n");
@@ -3919,6 +3940,22 @@ static ssize_t store_boo(struct lge_touch_data *ts, const char *buf, size_t coun
 }
 #endif
 
+static ssize_t show_boosted_time(struct lge_touch_data *ts, char *buf)
+{
+	return sprintf(buf, "%d\n", boosted_time);
+}
+
+static ssize_t store_boosted_time(struct lge_touch_data *ts, const char *buf,
+			     size_t count)
+{
+	unsigned int value;
+	sscanf(buf, "%d", &value);
+
+	boosted_time = value;
+
+	return count;
+}
+
 static LGE_TOUCH_ATTR(platform_data, S_IRUGO | S_IWUSR, show_platform_data, NULL);
 static LGE_TOUCH_ATTR(firmware, S_IRUGO | S_IWUSR, show_fw_info, store_fw_upgrade);
 static LGE_TOUCH_ATTR(fw_ver, S_IRUGO | S_IWUSR, show_fw_ver, NULL);
@@ -3929,6 +3966,7 @@ static LGE_TOUCH_ATTR(keyguard, S_IRUGO | S_IWUSR, NULL, store_keyguard_info);
 static LGE_TOUCH_ATTR(virtualkeys, S_IRUGO | S_IWUSR, show_virtual_key, NULL);
 static LGE_TOUCH_ATTR(jitter, S_IRUGO | S_IWUSR, NULL, store_jitter_solution);
 static LGE_TOUCH_ATTR(accuracy, S_IRUGO | S_IWUSR, NULL, store_accuracy_solution);
+static LGE_TOUCH_ATTR(boost_time, S_IRUGO | S_IWUSR, show_boosted_time, store_boosted_time);
 #ifdef CUST_G2_TOUCH
 static LGE_TOUCH_ATTR(incoming_call, S_IRUGO | S_IWUSR, NULL, store_incoming_call);
 static LGE_TOUCH_ATTR(f54, S_IRUGO | S_IWUSR, show_f54, store_f54);
@@ -3979,6 +4017,7 @@ static struct attribute *lge_touch_attribute_list[] = {
 #ifdef CONFIG_MACH_MSM8974_G2_DCM
 	&lge_touch_attr_boo.attr,
 #endif
+	&lge_touch_attr_boost_time.attr,
 	NULL,
 };
 
@@ -4740,6 +4779,8 @@ static int touch_probe(struct i2c_client *client, const struct i2c_device_id *id
 		ts->accuracy_filter.pen_pressure = 35;
 	}
 
+	setup_timer(&boost_timer, handle_boost, 0);
+
 #if defined(CONFIG_FB)
 	ts->fb_notif.notifier_call = fb_notifier_callback;
 	if((ret = fb_register_client(&ts->fb_notif)))
@@ -4855,6 +4896,7 @@ static int touch_remove(struct i2c_client *client)
 	}
 #endif
 
+	del_timer(&boost_timer);
 	input_unregister_device(ts->input_dev);
 #ifdef CUST_G2_TOUCH_WAKEUP_GESTURE
 	wake_lock_destroy(&touch_wake_lock);
