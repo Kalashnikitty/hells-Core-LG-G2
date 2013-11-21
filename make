@@ -1,6 +1,6 @@
 #!/bin/bash
 export ARCH=arm
-config=hells_defconfig
+config=hells_cm_defconfig
 
 if [ ! -f out/zImage ]
 then
