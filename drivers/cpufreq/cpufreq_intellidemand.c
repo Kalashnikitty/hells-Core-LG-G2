@@ -192,7 +192,7 @@ static struct dbs_tuners {
 	.optimal_freq = DBS_OPTIMAL_FREQ,
 	.freq_boost_time = DEFAULT_FREQ_BOOST_TIME,
 	.boostfreq = 1267200,
-	.two_phase_freq = 1728000,
+	.two_phase_freq = 1804800,
 };
 
 static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
