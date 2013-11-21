@@ -207,10 +207,6 @@ on post-fs-data
 
     rm /data/local/tmp/adreno_config.txt
 
-    # communicate with mpdecision and thermald
-    mkdir /dev/socket/mpdecision 0770 system system
-    chmod 2770 /dev/socket/mpdecision
-
     # Enable Power modes and set the CPU Freq Sampling rates
     write /sys/module/lpm_resources/enable_low_power/l2 2
     write /sys/module/lpm_resources/enable_low_power/pxo 1
@@ -352,9 +348,6 @@ service sdcard /system/bin/sdcard /data/media /mnt/shell/emulated 1023 1023
     class late_start
 
 service thermald /system/bin/thermald
-    class main
-
-service mpdecision /system/bin/mpdecision --no_sleep --avg_comp
     class main
 
 service qcamerasvr /system/bin/mm-qcamera-daemon
