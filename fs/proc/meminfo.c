@@ -94,6 +94,9 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 		"Ion:            %8lu kB\n"
 		"Iommu:          %8lu kB\n"
 #endif
+#ifdef CONFIG_UKSM
+		"KsmZeroPages:   %8lu kB\n"
+#endif
 #ifdef CONFIG_QUICKLIST
 		"Quicklists:     %8lu kB\n"
 #endif
@@ -159,6 +162,9 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 		K(global_page_state(NR_KGSL_PAGES)),
 		K(global_page_state(NR_ION_PAGES)),
 		K(global_page_state(NR_IOMMU_PAGES)),
+#endif
+#ifdef CONFIG_UKSM
+		K(global_page_state(NR_UKSM_ZERO_PAGES)),
 #endif
 #ifdef CONFIG_QUICKLIST
 		K(quicklist_total_size()),
