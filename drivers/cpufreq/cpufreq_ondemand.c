@@ -380,6 +380,7 @@ show_one(middle_grid_load, middle_grid_load);
 show_one(high_grid_load, high_grid_load);
 show_one(sync_freq, sync_freq);
 show_one(boostpulse, boosted);
+show_one(boosttime, freq_boost_time);
 show_one(boostfreq, boostfreq);
 show_one(optimal_max_freq, optimal_max_freq);
 #ifdef CONFIG_CPU_FREQ_GOV_LCDOFF
@@ -455,20 +456,30 @@ static void update_sampling_rate(unsigned int new_rate)
 	put_online_cpus();
 }
 
+static ssize_t store_boosttime(struct kobject *kobj, struct attribute *attr,
+				const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	dbs_tuners_ins.freq_boost_time = input;
+	return count;
+}
+
+
 static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
 				const char *buf, size_t count)
 {
 	int ret;
-	unsigned int input;
+	unsigned long val;
 
-	ret = sscanf(buf, "%u", &input);
+	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
-
-	if (input > 1)
-		dbs_tuners_ins.freq_boost_time = input;
-	else
-		dbs_tuners_ins.freq_boost_time = DEFAULT_FREQ_BOOST_TIME;
 
 	dbs_tuners_ins.boosted = 1;
 	freq_boosted_time = ktime_to_us(ktime_get());
@@ -928,6 +939,7 @@ define_one_global_rw(optimal_freq);
 define_one_global_rw(up_threshold_any_cpu_load);
 define_one_global_rw(sync_freq);
 define_one_global_rw(boostpulse);
+define_one_global_rw(boosttime);
 define_one_global_rw(boostfreq);
 define_one_global_rw(optimal_max_freq);
 define_one_global_rw(middle_grid_step);
@@ -958,6 +970,7 @@ static struct attribute *dbs_attributes[] = {
 	&up_threshold_any_cpu_load.attr,
 	&sync_freq.attr,
 	&boostpulse.attr,
+	&boosttime.attr,
 	&boostfreq.attr,
 	&middle_grid_step.attr,
 	&high_grid_step.attr,
