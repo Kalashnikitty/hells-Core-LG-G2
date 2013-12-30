@@ -46,9 +46,6 @@
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
 #define MIN_FREQUENCY_DOWN_DIFFERENTIAL		(1)
-#define DEFAULT_FREQ_BOOST_TIME			(2500000)
-
-u64 freq_boosted_time;
 #define DEF_MIDDLE_GRID_STEP           		(14)
 #define DEF_HIGH_GRID_STEP             		(20)
 #define DEF_MIDDLE_GRID_LOAD			(65)
@@ -169,9 +166,6 @@ static struct dbs_tuners {
 	unsigned int sampling_down_factor;
 	int          powersave_bias;
 	unsigned int io_is_busy;
-	unsigned int boosted;
-	unsigned int freq_boost_time;
-	unsigned int boostfreq;
 	unsigned int optimal_max_freq;
 	unsigned int middle_grid_step;
 	unsigned int high_grid_step;
@@ -200,7 +194,6 @@ static struct dbs_tuners {
 	.powersave_bias = 0,
 	.sync_freq = 0,
 	.optimal_freq = 0,
-	.freq_boost_time = DEFAULT_FREQ_BOOST_TIME,
 	.optimal_max_freq = DEF_OPTIMAL_FREQ,
 	#ifdef CONFIG_CPU_FREQ_GOV_LCDOFF
 	.lcdoff_middle_grid_step = DEF_LCDOFF_MIDDLE_GRID_STEP,
@@ -378,9 +371,6 @@ show_one(high_grid_step, high_grid_step);
 show_one(middle_grid_load, middle_grid_load);
 show_one(high_grid_load, high_grid_load);
 show_one(sync_freq, sync_freq);
-show_one(boostpulse, boosted);
-show_one(boosttime, freq_boost_time);
-show_one(boostfreq, boostfreq);
 show_one(optimal_max_freq, optimal_max_freq);
 #ifdef CONFIG_CPU_FREQ_GOV_LCDOFF
 show_one(lcdoff_middle_grid_step, lcdoff_middle_grid_step);
@@ -455,50 +445,10 @@ static void update_sampling_rate(unsigned int new_rate)
 	put_online_cpus();
 }
 
-static ssize_t store_boosttime(struct kobject *kobj, struct attribute *attr,
-				const char *buf, size_t count)
-{
-	unsigned int input;
-	int ret;
-
-	ret = sscanf(buf, "%u", &input);
-	if (ret != 1)
-		return -EINVAL;
-
-	dbs_tuners_ins.freq_boost_time = input;
-	return count;
-}
-
-
-static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
-				const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	dbs_tuners_ins.boosted = 1;
-	freq_boosted_time = ktime_to_us(ktime_get());
-
 	if (sampling_rate_boosted) {
 		sampling_rate_boosted = 0;
 		dbs_tuners_ins.sampling_rate = current_sampling_rate;
 	}
-	return count;
-}
-
-static ssize_t store_boostfreq(struct kobject *a, struct attribute *b,
-				   const char *buf, size_t count)
-{
-	unsigned int input;
-	int ret;
-	ret = sscanf(buf, "%u", &input);
-	if (ret != 1)
-		return -EINVAL;
-	dbs_tuners_ins.boostfreq = input;
 	return count;
 }
 
@@ -937,9 +887,6 @@ define_one_global_rw(up_threshold_multi_core);
 define_one_global_rw(optimal_freq);
 define_one_global_rw(up_threshold_any_cpu_load);
 define_one_global_rw(sync_freq);
-define_one_global_rw(boostpulse);
-define_one_global_rw(boosttime);
-define_one_global_rw(boostfreq);
 define_one_global_rw(optimal_max_freq);
 define_one_global_rw(middle_grid_step);
 define_one_global_rw(high_grid_step);
@@ -968,9 +915,6 @@ static struct attribute *dbs_attributes[] = {
 	&optimal_max_freq.attr,
 	&up_threshold_any_cpu_load.attr,
 	&sync_freq.attr,
-	&boostpulse.attr,
-	&boosttime.attr,
-	&boostfreq.attr,
 	&middle_grid_step.attr,
 	&high_grid_step.attr,
 	&middle_grid_load.attr,
@@ -1020,15 +964,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	this_dbs_info->freq_lo = 0;
 	policy = this_dbs_info->cur_policy;
 	j_dbs_info = &per_cpu(od_cpu_dbs_info, j);
-
-	/* Only core0 controls the boost */
-	if (dbs_tuners_ins.boosted && policy->cpu == 0) {
-		if (ktime_to_us(ktime_get()) - freq_boosted_time >=
-					dbs_tuners_ins.freq_boost_time) {
-			dbs_tuners_ins.boosted = 0;
-		}
-	}
-
+	
 	/* Only core0 controls the timer_rate */
 	if (sampling_rate_boosted && policy->cpu == 0) {
 		if (ktime_to_us(ktime_get()) - sampling_rate_boosted_time >=
@@ -1243,13 +1179,6 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 		}
 	}
 
-	/* check for frequency boost */
-	if (dbs_tuners_ins.boosted && policy->cur < dbs_tuners_ins.boostfreq) {
-		dbs_freq_increase(policy, dbs_tuners_ins.boostfreq);
-		dbs_tuners_ins.boostfreq = policy->cur;
-		return;
-	}
-
 	/* Check for frequency decrease */
 	/* if we cannot reduce the frequency anymore, break out early */
 	if (policy->cur == policy->min)
@@ -1268,10 +1197,6 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 				(dbs_tuners_ins.up_threshold -
 				 dbs_tuners_ins.down_differential);
 
-		if (dbs_tuners_ins.boosted &&
-				freq_next < dbs_tuners_ins.boostfreq) {
-			freq_next = dbs_tuners_ins.boostfreq;
-		}
 		/* No longer fully busy, reset rate_mult */
 		this_dbs_info->rate_mult = 1;
 
