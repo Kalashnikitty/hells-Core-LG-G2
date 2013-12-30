@@ -49,7 +49,7 @@
 #define DEFAULT_FREQ_BOOST_TIME			(500000)
 #define MAX_FREQ_BOOST_TIME				(5000000)
 
-static u64 freq_boosted_time;
+u64 freq_boosted_time;
 #define DEF_MIDDLE_GRID_STEP           		(14)
 #define DEF_HIGH_GRID_STEP             		(20)
 #define DEF_MIDDLE_GRID_LOAD			(65)
