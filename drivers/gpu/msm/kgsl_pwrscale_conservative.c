@@ -55,7 +55,7 @@ static struct gpu_thresh_tbl thresh_tbl[] = {
 };
 
 #define BOOSTED_POWERLEVEL 2
-static unsigned int enable_boost = 1;
+static unsigned int enable_boost = 0;
 static unsigned int boosted_pwrlevel = BOOSTED_POWERLEVEL;
 
 static void conservative_wake(struct kgsl_device *device,
@@ -84,7 +84,7 @@ static void conservative_idle(struct kgsl_device *device,
 	int val = 0;
 	unsigned int loadpct;
 
-	if (enable_boost == 1 && d802_boosted == 1) {
+	if (enable_boost == 1 && hammerhead_boosted == 1) {
 		if (boosted_pwrlevel < pwr->active_pwrlevel)
 			kgsl_pwrctrl_pwrlevel_change(device, boosted_pwrlevel);
 
