@@ -1048,8 +1048,8 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 				(dbs_tuners_ins.up_threshold -
 				 dbs_tuners_ins.down_differential);
 
-		if ((dbs_tuners_ins.boosted || d802_boosted)
-				&& freq_next < dbs_tuners_ins.boostfreq) {
+		if (dbs_tuners_ins.boosted &&
+				freq_next < dbs_tuners_ins.boostfreq) {
 			freq_next = dbs_tuners_ins.boostfreq;
 		}
 
